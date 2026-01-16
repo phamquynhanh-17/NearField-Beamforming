@@ -1,0 +1,45 @@
+function fitness = objective_WOA(x, para, H)
+    M = para.M; K = para.K;
+    N_sub = size(H, 3);
+    num_el = M * K;
+    
+    % Khôi phục ma trận phức
+    W_real = reshape(x(1 : num_el), M, K);
+    W_imag = reshape(x(num_el + 1 : 2*num_el), M, K);
+    W = W_real + 1i * W_imag;
+    
+    % Chuẩn hóa công suất
+    P_limit = para.P_total;
+    p_curr = norm(W, 'fro')^2;
+    if p_curr > P_limit
+        W = W * sqrt(P_limit / p_curr);
+    end
+
+    R_sum = 0;
+    for n = 1:N_sub
+        H_n = H(:,:,n); 
+        
+        % Đảm bảo ma trận tích là (K x K)
+        if size(H_n, 1) == M
+            % H_n' là (K x M), W là (M x K) -> (K x K)
+            term = eye(K) + (H_n' * W * W' * H_n);
+        else
+            % H_n là (K x M), W là (M x K) -> (K x K)
+            term = eye(K) + (H_n * W * W' * H_n');
+        end
+        
+        % Tối ưu: Dùng trị riêng để tính log2(det) tránh lỗi Inf/NaN
+        % log2(det(A)) = sum(log2(eig(A)))
+        e = real(eig(term)); 
+        e(e < 1e-12) = 1e-12; % Loại bỏ giá trị âm do sai số máy tính
+        R_sum = R_sum + sum(log2(e));
+    end
+    
+    % Trả về kết quả trung bình trên các subcarriers
+    fitness = -(R_sum / N_sub); 
+    
+    % Kiểm tra lỗi NaN (nếu có)
+    if isnan(fitness)
+        fitness = 0;
+    end
+end
